@@ -1,53 +1,67 @@
-import React, { useState } from 'react';
-import { ExclamationTriangleIcon, CopyIcon, CheckIcon, ShieldCheckIcon, TargetIcon, LightbulbIcon, MicroscopeIcon, LinkIcon, ZapIcon } from './icons';
-import type { ErrorResponse, QualityMetrics, QualityScore } from '../types';
+import React, { useState, useEffect } from 'react';
+import { ExclamationTriangleIcon, CopyIcon, CheckIcon, LightbulbIcon, ShieldCheckIcon, TargetIcon, ChartBarIcon } from './icons';
+import type { LinkedInReplyOutput, ErrorResponse } from '../types';
 
-interface ResponseOutputProps {
+const TabButton: React.FC<{ active: boolean; onClick: () => void; children: React.ReactNode }> = ({ active, onClick, children }) => (
+    <button
+        onClick={onClick}
+        className={`px-4 py-2 text-sm font-semibold rounded-md transition-colors ${
+            active
+                ? 'bg-cyan-500/10 text-cyan-300'
+                : 'text-slate-400 hover:bg-navy-800'
+        }`}
+    >
+        {children}
+    </button>
+);
+
+const ScoreDisplay: React.FC<{ label: string; score: string }> = ({ label, score }) => {
+    const [valueStr, maxStr] = score.split('/');
+    const value = parseFloat(valueStr);
+    const max = parseInt(maxStr, 10);
+    const percentage = (value / max) * 100;
+    
+    let color = 'bg-cyan-500';
+    if (percentage < 40) color = 'bg-red-500';
+    else if (percentage < 70) color = 'bg-yellow-500';
+
+    return (
+        <div>
+            <div className="flex justify-between items-center text-sm mb-1">
+                <span className="font-semibold text-slate-300">{label}</span>
+                <span className="font-bold text-slate-200">{score}</span>
+            </div>
+            <div className="w-full bg-navy-950 rounded-full h-2">
+                <div className={`${color} h-2 rounded-full`} style={{ width: `${percentage}%` }}></div>
+            </div>
+        </div>
+    );
+};
+
+const ResponseOutput: React.FC<{
   isLoading: boolean;
   loadingStatus: string;
   error: ErrorResponse | string | null;
-  reply: string;
-  references: string;
-  qualityMetrics: QualityMetrics | null;
-  isFallbackResponse: boolean;
-}
+  replyOutput: LinkedInReplyOutput | null;
+}> = ({ isLoading, loadingStatus, error, replyOutput }) => {
+  const [activeTab, setActiveTab] = useState<'analysis' | 'quality' | 'alternatives'>('analysis');
+  const [copied, setCopied] = useState(false);
 
-const QualityBar: React.FC<{ score: number }> = ({ score }) => {
-  const width = `${score}%`;
-  let bgColor = 'bg-green-500';
-  if (score < 50) bgColor = 'bg-red-500';
-  else if (score < 75) bgColor = 'bg-yellow-500';
-
-  return (
-    <div className="w-full bg-navy-700 rounded-full h-2.5">
-      <div className={`${bgColor} h-2.5 rounded-full`} style={{ width }}></div>
-    </div>
-  );
-};
-
-const MetricDisplay: React.FC<{ icon: React.ReactNode, metric: QualityScore }> = ({ icon, metric }) => (
-  <div>
-    <div className="flex justify-between items-center mb-1">
-      <div className="flex items-center gap-2">
-        {icon}
-        <p className="font-semibold text-slate-300">{metric.score}/100</p>
-      </div>
-    </div>
-    <QualityBar score={metric.score} />
-    <p className="text-xs text-slate-400 mt-1.5">{metric.justification}</p>
-  </div>
-);
-
-
-const ResponseOutput: React.FC<ResponseOutputProps> = ({ isLoading, loadingStatus, error, reply, references, qualityMetrics, isFallbackResponse }) => {
-  const [isCopied, setIsCopied] = useState(false);
+  useEffect(() => {
+    if (replyOutput) {
+      setActiveTab('analysis');
+      setCopied(false);
+    }
+  }, [replyOutput]);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(reply);
-    setIsCopied(true);
-    setTimeout(() => setIsCopied(false), 2000);
+    if (replyOutput?.reply.text) {
+      navigator.clipboard.writeText(replyOutput.reply.text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
-  
+
   if (isLoading) {
     return (
        <div className="bg-navy-900/50 rounded-xl shadow-2xl p-6 border border-navy-700 min-h-[300px] flex flex-col items-center justify-center text-center">
@@ -58,7 +72,7 @@ const ResponseOutput: React.FC<ResponseOutputProps> = ({ isLoading, loadingStatu
                 </svg>
             </div>
             <p className="font-semibold text-slate-200">{loadingStatus}</p>
-            <p className="text-sm text-slate-500 mt-1">AI inference network is processing...</p>
+            <p className="text-sm text-slate-500 mt-1">AI Strategist is crafting the perfect reply...</p>
          </div>
     );
   }
@@ -67,7 +81,7 @@ const ResponseOutput: React.FC<ResponseOutputProps> = ({ isLoading, loadingStatu
     return (
       <div className="bg-red-900/20 rounded-xl shadow-2xl p-6 border border-red-500/50 min-h-[300px] flex flex-col items-center justify-center text-center">
         <ExclamationTriangleIcon className="w-12 h-12 text-red-400 mb-4" />
-        <p className="font-semibold text-red-300 text-lg">Failed to Generate Reply</p>
+        <p className="font-semibold text-red-300 text-lg">Reply Generation Failed</p>
         <p className="text-sm text-slate-300 mt-1 mb-4 max-w-md">
           {typeof error === 'string' ? error : error.userMessage}
         </p>
@@ -80,58 +94,100 @@ const ResponseOutput: React.FC<ResponseOutputProps> = ({ isLoading, loadingStatu
     );
   }
 
-  if (!reply) {
+  if (!replyOutput) {
     return (
       <div className="bg-navy-900/50 rounded-xl shadow-2xl p-6 border border-navy-700 min-h-[300px] flex flex-col items-center justify-center text-slate-500">
-        <p>Your AI-generated expert reply will appear here.</p>
+        <p>Your generated LinkedIn reply will appear here.</p>
       </div>
     );
   }
 
+  const { analysis, reply, qualityScore, alternativeVersions, isDemonstration } = replyOutput;
+
   return (
-    <div className="bg-navy-900/50 rounded-xl shadow-2xl p-6 border border-navy-700 space-y-8">
-        {isFallbackResponse && (
-          <div className="bg-yellow-900/30 border border-yellow-500/50 text-yellow-200 text-sm rounded-lg p-3 flex items-start gap-3">
-            <ZapIcon className="w-5 h-5 flex-shrink-0 mt-0.5 text-yellow-400"/>
-            <div>
-              <h4 className="font-bold">Static Fallback Activated</h4>
-              <p className="text-yellow-300/80">API quota limit was detected. This reply was generated using the internal knowledge base to ensure a successful response.</p>
-            </div>
-          </div>
-        )}
-        <div>
-            <div className="flex justify-between items-center mb-3">
-                <h2 className="text-xl font-bold text-slate-100">2. Generated Reply</h2>
-                <button onClick={handleCopy} className="px-3 py-1.5 text-sm font-medium bg-navy-800 text-slate-300 rounded-md hover:bg-navy-700 transition-colors flex items-center">
-                    {isCopied ? <CheckIcon className="w-4 h-4 mr-1.5 text-green-400"/> : <CopyIcon className="w-4 h-4 mr-1.5"/>}
-                    {isCopied ? 'Copied!' : 'Copy'}
-                </button>
-            </div>
-            <div className="bg-navy-950 p-4 border border-navy-700 rounded-lg space-y-4">
-                <p className="text-slate-300 whitespace-pre-wrap leading-relaxed font-serif">{reply}</p>
-            </div>
+    <div className="bg-navy-900/50 rounded-xl shadow-2xl p-6 border border-navy-700 space-y-6">
+       {isDemonstration && (
+        <div className="bg-yellow-900/30 border border-yellow-600/50 rounded-lg p-4 text-center">
+          <p className="font-bold text-yellow-300">Demonstration Mode</p>
+          <p className="text-sm text-yellow-400/80 mt-1">The live API quota has been reached. A high-quality example is being shown to demonstrate full functionality.</p>
+        </div>
+      )}
+
+        <h2 className="text-xl font-bold text-slate-100">2. Generated Reply & Analysis</h2>
+        
+        <div className="bg-navy-950 p-4 border-2 border-cyan-500/30 rounded-lg space-y-4 relative group">
+            <p className="text-slate-300 whitespace-pre-wrap leading-relaxed font-serif">{reply.text}</p>
+            <button onClick={handleCopy} className="absolute top-2 right-2 p-2 bg-navy-800 rounded-md text-slate-400 hover:bg-navy-700 hover:text-white transition opacity-0 group-hover:opacity-100">
+                {copied ? <CheckIcon className="w-5 h-5 text-green-400" /> : <CopyIcon className="w-5 h-5" />}
+            </button>
+        </div>
+
+        <div className="border-b border-navy-700 flex items-center gap-2">
+            <TabButton active={activeTab === 'analysis'} onClick={() => setActiveTab('analysis')}>Strategic Analysis</TabButton>
+            <TabButton active={activeTab === 'quality'} onClick={() => setActiveTab('quality')}>Quality Score</TabButton>
+            <TabButton active={activeTab === 'alternatives'} onClick={() => setActiveTab('alternatives')}>Alternatives</TabButton>
         </div>
         
-        {qualityMetrics && (
-            <div>
-                <h3 className="text-lg font-bold text-slate-200 mb-3">3. Quality Evaluation (Overall: {qualityMetrics.overallScore.toFixed(0)}/100)</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-navy-950 p-4 border border-navy-700 rounded-lg">
-                    <MetricDisplay icon={<ShieldCheckIcon className="w-5 h-5 text-cyan-400" />} metric={qualityMetrics.adherenceToStyle} />
-                    <MetricDisplay icon={<MicroscopeIcon className="w-5 h-5 text-cyan-400" />} metric={qualityMetrics.technicalDepth} />
-                    <MetricDisplay icon={<LinkIcon className="w-5 h-5 text-cyan-400" />} metric={qualityMetrics.citationQuality} />
-                    <MetricDisplay icon={<LightbulbIcon className="w-5 h-5 text-cyan-400" />} metric={qualityMetrics.strategicQuestion} />
+        <div>
+            {activeTab === 'analysis' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    {Object.entries(analysis).map(([key, value]) => (
+                        <div key={key} className="bg-navy-950 p-3 border border-navy-700 rounded-lg">
+                            <p className="font-bold capitalize text-slate-400 mb-1">{key.replace(/([A-Z])/g, ' $1').trim()}</p>
+                            <p className="text-slate-300">{value}</p>
+                        </div>
+                    ))}
                 </div>
-            </div>
-        )}
-
-        {references && (
-            <div>
-                <h3 className="text-lg font-bold text-slate-200 mb-3">4. References</h3>
-                <div className="bg-navy-950 p-4 border border-navy-700 rounded-lg space-y-2">
-                    <p className="text-slate-400 whitespace-pre-wrap text-sm">{references}</p>
+            )}
+            {activeTab === 'quality' && (
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                        <h3 className="font-bold text-slate-300">Metrics</h3>
+                        <ScoreDisplay label="Value Add" score={qualityScore.valueAdd} />
+                        <ScoreDisplay label="Engagement Potential" score={qualityScore.engagementPotential} />
+                        <ScoreDisplay label="Tone Alignment" score={qualityScore.toneAlignment} />
+                        <ScoreDisplay label="Credibility" score={qualityScore.credibility} />
+                         <div className="pt-2">
+                             <ScoreDisplay label="Overall" score={qualityScore.overall} />
+                        </div>
+                    </div>
+                    <div className="space-y-4">
+                        {qualityScore.improvements?.length > 0 && (
+                             <div>
+                                <h3 className="font-bold text-slate-300 mb-2 flex items-center gap-2"><LightbulbIcon className="w-5 h-5 text-yellow-400" /> Improvements</h3>
+                                <ul className="list-disc list-inside space-y-1 text-sm text-slate-400">
+                                    {qualityScore.improvements.map((item, i) => <li key={i}>{item}</li>)}
+                                </ul>
+                            </div>
+                        )}
+                         {qualityScore.risks?.length > 0 && (
+                             <div>
+                                <h3 className="font-bold text-slate-300 mb-2 flex items-center gap-2"><ShieldCheckIcon className="w-5 h-5 text-red-400" /> Risks</h3>
+                                <ul className="list-disc list-inside space-y-1 text-sm text-slate-400">
+                                    {qualityScore.risks.map((item, i) => <li key={i}>{item}</li>)}
+                                </ul>
+                            </div>
+                        )}
+                    </div>
+                 </div>
+            )}
+            {activeTab === 'alternatives' && (
+                <div className="space-y-4">
+                    <div className="bg-navy-950 p-4 border border-navy-700 rounded-lg">
+                        <h3 className="font-bold text-slate-300 mb-2">Shorter Version</h3>
+                        <p className="text-sm text-slate-400 whitespace-pre-wrap font-serif">{alternativeVersions.shorter}</p>
+                    </div>
+                     <div className="bg-navy-950 p-4 border border-navy-700 rounded-lg">
+                        <h3 className="font-bold text-slate-300 mb-2">Longer Version</h3>
+                        <p className="text-sm text-slate-400 whitespace-pre-wrap font-serif">{alternativeVersions.longer}</p>
+                    </div>
+                     <div className="bg-navy-950 p-4 border border-navy-700 rounded-lg">
+                        <h3 className="font-bold text-slate-300 mb-2">Different Tone</h3>
+                        <p className="text-sm text-slate-400 whitespace-pre-wrap font-serif">{alternativeVersions.differentTone}</p>
+                    </div>
                 </div>
-            </div>
-        )}
+            )}
+        </div>
     </div>
   );
 };

@@ -2,27 +2,35 @@ import React from 'react';
 import { SparklesIcon } from './icons';
 
 interface PostInputProps {
-  post: string;
+  originalPost: string;
   onPostChange: (value: string) => void;
   onGenerate: () => void;
   isLoading: boolean;
   loadingStatus: string;
 }
 
-const PostInput: React.FC<PostInputProps> = ({ post, onPostChange, onGenerate, isLoading, loadingStatus }) => {
+const PostInput: React.FC<PostInputProps> = ({ originalPost, onPostChange, onGenerate, isLoading, loadingStatus }) => {
+  
+  const canGenerate = originalPost.trim() && !isLoading;
+
   return (
     <div className="bg-navy-900/50 rounded-xl shadow-2xl p-6 border border-navy-700 space-y-6">
-      <h2 className="text-xl font-bold text-slate-100">1. Paste LinkedIn Post</h2>
-      <textarea
-        value={post}
-        onChange={(e) => onPostChange(e.target.value)}
-        placeholder="Paste the full text of the LinkedIn post here..."
-        className="w-full h-48 bg-navy-950 p-4 border-2 border-navy-700 rounded-lg focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 resize-y font-mono text-sm text-slate-300"
-        aria-label="LinkedIn Post Input"
-      />
+      <div className="space-y-4">
+        <div>
+          <label htmlFor="originalPost" className="block text-lg font-bold text-slate-100 mb-2">1. Paste Original LinkedIn Post</label>
+          <textarea
+            id="originalPost"
+            value={originalPost}
+            onChange={(e) => onPostChange(e.target.value)}
+            placeholder="Paste the full text of the LinkedIn post you want to reply to here..."
+            className="w-full h-48 bg-navy-950 p-4 border-2 border-navy-700 rounded-lg focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 resize-y font-mono text-sm text-slate-300"
+            aria-label="Original LinkedIn Post Input"
+          />
+        </div>
+      </div>
       <button
         onClick={onGenerate}
-        disabled={!post.trim() || isLoading}
+        disabled={!canGenerate}
         className="w-full flex items-center justify-center mt-4 px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold rounded-lg hover:from-cyan-600 hover:to-blue-700 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-cyan-500/30"
       >
         {isLoading ? (
@@ -36,7 +44,7 @@ const PostInput: React.FC<PostInputProps> = ({ post, onPostChange, onGenerate, i
         ) : (
           <>
             <SparklesIcon className="w-5 h-5 mr-2" />
-            Generate Expert Reply
+            Generate Reply
           </>
         )}
       </button>

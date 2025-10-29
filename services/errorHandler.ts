@@ -23,7 +23,6 @@ class EnhancedErrorHandler {
   handleError(error: any, context: ErrorContext): ErrorResponse {
     this.recordError(error, context);
     
-    // Analyze error type and provide appropriate response
     if (this.isRateLimitError(error)) {
       return this.handleRateLimitError(error);
     }
@@ -49,7 +48,6 @@ class EnhancedErrorHandler {
 
   private isRateLimitError(error: any): boolean {
     const message = (error?.message || '').toLowerCase();
-    // Safely access nested properties
     const code = error?.error?.code;
     const status = error?.error?.status?.toLowerCase();
 
@@ -87,11 +85,11 @@ class EnhancedErrorHandler {
   private handleContentGenerationError(error: any): ErrorResponse {
     return {
       message: error.message || 'AI failed to generate content.',
-      userMessage: "The AI was unable to generate a reply. This can happen if the post's topic is outside the integrated knowledge base or if the input is ambiguous.",
+      userMessage: "Reply generation halted. The input may be ambiguous or fall outside of operational parameters.",
       suggestions: [
-        'Ensure the post is related to the known scientific domains.',
-        'Try a different post to see if the issue persists.',
-        'If the problem continues, there might be a temporary issue with the AI service.'
+        'Refine the original post content and resubmit.',
+        'Ensure the post does not contain unusual formatting.',
+        'If the issue persists, the topic may be restricted by safety policies.'
       ],
       severity: 'medium',
       canRetry: true,
@@ -110,11 +108,10 @@ class EnhancedErrorHandler {
     if (isHardQuota) {
       return {
         message: error.message || 'Hard quota limit exceeded',
-        userMessage: "It looks like the current API key has run out of its available quota. To continue, the application needs to be configured with a new API key.",
+        userMessage: "The current API key has exhausted its available quota. Operations cannot continue until the key is updated.",
         suggestions: [
-          'I see you\'re trying to provide a new key. That\'s the right instinct! For security reasons, I can\'t accept the key directly here. Instead, you need to update it in the application\'s environment.',
-          '**The Solution:** The API key must be set as an environment variable named `API_KEY`. You will need to stop the application, set this variable in your system, and then restart the application.',
-          'For more details on managing your keys and usage, please visit the Google AI Studio console.',
+          'The API key must be replaced in the application\'s environment configuration.',
+          'Visit the Google AI Studio console to manage billing and API keys.',
         ],
         severity: 'critical',
         canRetry: false,
@@ -125,11 +122,11 @@ class EnhancedErrorHandler {
       message: error.message || 'Rate limit exceeded',
       userMessage: isSearchQuota
         ? 'The daily Google Search quota has been reached. The comment was generated using internal knowledge and may lack recent citations.'
-        : `The request limit has been reached. Please wait ${this.formatDelay(retryDelay)} before trying again.`,
+        : `Request limit reached. Stand by for retry in ${this.formatDelay(retryDelay)}.`,
       suggestions: [
         isSearchQuota 
           ? 'Comments will still be generated using internal scientific knowledge.'
-          : 'Please try again in a few moments.',
+          : 'Please wait for the automatic retry.',
         'For higher limits, consider upgrading your plan on ai.google.dev.',
       ],
       severity: isSearchQuota ? 'medium' : 'high',
@@ -141,11 +138,10 @@ class EnhancedErrorHandler {
   private handleOverloadError(error: any): ErrorResponse {
     return {
       message: 'Service temporarily overloaded',
-      userMessage: 'The AI model is currently experiencing high demand. Please try again in a moment.',
+      userMessage: 'The AI model is at maximum capacity. Please wait for a moment.',
       suggestions: [
-        'The system will automatically retry your request a few times.',
-        'Peak usage times are typically 9-11 AM and 2-4 PM EST.',
-        'For immediate results, try again during off-peak hours.'
+        'The system will automatically retry your request.',
+        'Consider retrying during off-peak hours for immediate results.',
       ],
       severity: 'medium',
       canRetry: true,
@@ -159,11 +155,11 @@ class EnhancedErrorHandler {
     return {
       message: 'Authentication failed',
       userMessage: isExpired
-        ? 'The API key has expired. Please update it to continue.'
-        : 'Authentication failed. Please check your API key configuration.',
+        ? 'The API key has expired. Update it to restore functionality.'
+        : 'Authentication failed. Verify API key configuration.',
       suggestions: [
         'Obtain a new API key from ai.google.dev.',
-        'Ensure the API key is correctly set in your environment.',
+        'Ensure the API key is correctly set in the environment.',
       ],
       severity: 'critical',
       canRetry: false
@@ -173,11 +169,10 @@ class EnhancedErrorHandler {
   private handleNetworkError(error: any): ErrorResponse {
     return {
       message: 'Network connection error',
-      userMessage: 'Unable to connect to the service. Please check your internet connection.',
+      userMessage: 'Connection to the service failed. Check your network status.',
       suggestions: [
         'Verify your internet connection is active.',
-        'Check if you can access other websites.',
-        'Try disabling any VPN or proxy if enabled.',
+        'Check for any active firewalls, VPNs, or proxies.',
       ],
       severity: 'high',
       canRetry: true,
@@ -186,28 +181,20 @@ class EnhancedErrorHandler {
   }
 
   private handleGenericError(error: any): ErrorResponse {
-    const isFrequentError = this.isFrequentError(error.message);
-    let userMessage = 'An unexpected error occurred. Please try again.';
+    let userMessage = 'Execution failed due to an unexpected issue. Please verify input and try again.';
     if((error?.message || '').includes('SAFETY')) {
-        userMessage = "The response could not be generated due to safety settings.";
+        userMessage = "Execution halted by safety protocols. The response could not be generated.";
     } else if ((error?.message || '').includes('malformed')) {
-        userMessage = "The AI returned a malformed response. This can be a temporary issue, please try again.";
+        userMessage = "The AI returned a malformed response. This is a transient error. Please try again.";
     }
     
     return {
       message: error.message || 'An unexpected error occurred',
       userMessage,
-      suggestions: isFrequentError
-        ? [
-            'This error has occurred multiple times. Consider:',
-            '1. Simplifying your input text.',
-            '2. Refreshing the page.',
-            '3. Reporting this issue if it persists.'
-          ]
-        : [
-            'Refresh the page and try again.',
-            'Clear your browser cache if the problem continues.',
-          ],
+      suggestions: [
+        'Retry the operation.',
+        'If the problem persists, consider simplifying the input post.',
+      ],
       severity: 'medium',
       canRetry: true,
       retryDelay: 2000
@@ -269,19 +256,6 @@ class EnhancedErrorHandler {
     const message = error?.message || error?.toString() || 'unknown';
     return message.substring(0, 50);
   }
-
-  getErrorStatistics() {
-    const stats = new Map<string, number>();
-    for (const [key, contexts] of this.errorHistory.entries()) {
-      stats.set(key, contexts.length);
-    }
-    return Object.fromEntries(stats);
-  }
-
-  clearHistory(): void {
-    this.errorHistory.clear();
-  }
 }
 
 export const errorHandler = new EnhancedErrorHandler();
-export default EnhancedErrorHandler;
