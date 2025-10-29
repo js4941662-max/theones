@@ -1,5 +1,5 @@
 {
-  "name": "Copy of Copy of LinkedIn Scientific Reply AI",
-  "description": "An AI-powered assistant that generates expert-level, insightful replies for scientific LinkedIn posts, mimicking a specific, analytical communication style.",
+  "name": "AI LinkedIn Expert - Reply Generator",
+  "description": "An AI assistant that analyzes scientific and technical LinkedIn posts and generates expert-level replies with citations, adhering to a specific professional persona.",
   "requestFramePermissions": []
 }

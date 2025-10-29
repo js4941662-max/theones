@@ -1,4 +1,3 @@
-
 export interface ErrorResponse {
   message: string;
   userMessage: string;
@@ -8,8 +7,14 @@ export interface ErrorResponse {
   retryDelay?: number;
 }
 
+export interface AnalysisResult {
+  topic: string;
+  domain: 'Virology' | 'Molecular Biology' | 'Bioinformatics' | 'General';
+  summary: string;
+}
+
 export interface Reference {
-  marker: number;
+  number: number;
   title: string;
   authors: string;
   year: number;
@@ -17,21 +22,23 @@ export interface Reference {
   url: string;
 }
 
-export interface QualityMetrics {
-  scientificAccuracy: number;
-  citationRelevance: number;
-  technicalDepth: number;
-  noveltyOfInsight: number;
-  professionalTone: number;
-  sourceRelevance: number;
-  mechanisticClarity: number;
-  strategicInsight: number;
-  communicationClarity: number;
+export interface GenerationResult {
+  reply: string;
+  references: Reference[];
+  isFallback?: boolean; // Indicates if the reply was generated from the static fallback
 }
 
 export interface QualityScore {
-  overall: number;
-  metrics: QualityMetrics;
+  score: number; // A number from 0 to 100
+  justification: string;
+}
+
+export interface QualityMetrics {
+  adherenceToStyle: QualityScore;
+  technicalDepth: QualityScore;
+  citationQuality: QualityScore;
+  strategicQuestion: QualityScore;
+  overallScore: number; // Average score
 }
 
 export type StatusCallback = (status: string) => void;
